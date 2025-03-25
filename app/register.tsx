@@ -1,4 +1,6 @@
-import React, { useState } from "react";
+"use client";
+
+import { useState } from "react";
 import {
   View,
   Text,
@@ -8,15 +10,57 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import Button from "@/components/Button";
 import SocialButton from "../components/Socialbutton";
+import { useAuth } from "@/context/auth-context";
 
 export default function RegisterScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const { register, isLoading, error } = useAuth();
+
+  // Form validation
+  const validateForm = () => {
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      Alert.alert("Invalid Email", "Please enter a valid email address");
+      return false;
+    }
+
+    // Password validation
+    if (password.length < 6) {
+      Alert.alert(
+        "Weak Password",
+        "Password should be at least 6 characters long"
+      );
+      return false;
+    }
+
+    // Confirm password
+    if (password !== confirmPassword) {
+      Alert.alert("Password Mismatch", "Passwords do not match");
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleRegister = async () => {
+    if (validateForm()) {
+      try {
+        await register(email, password);
+      } catch (e) {
+        // Error is handled in the auth context
+      }
+    }
+  };
 
   return (
     <KeyboardAvoidingView
@@ -31,6 +75,8 @@ export default function RegisterScreen() {
           </TouchableOpacity>
           <Text style={styles.title}>Register Now!</Text>
 
+          {error && <Text style={styles.errorText}>{error}</Text>}
+
           <View style={styles.inputContainer}>
             <TextInput
               style={styles.input}
@@ -39,6 +85,7 @@ export default function RegisterScreen() {
               onChangeText={setEmail}
               keyboardType="email-address"
               autoCapitalize="none"
+              editable={!isLoading}
             />
             <TextInput
               style={styles.input}
@@ -46,10 +93,23 @@ export default function RegisterScreen() {
               value={password}
               onChangeText={setPassword}
               secureTextEntry
+              editable={!isLoading}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Confirm your password"
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              secureTextEntry
+              editable={!isLoading}
             />
           </View>
 
-          <Button title="Register" onPress={() => router.push("/(tabs)")} />
+          {isLoading ? (
+            <ActivityIndicator size="large" color="#00C2FF" />
+          ) : (
+            <Button title="Register" onPress={handleRegister} />
+          )}
 
           <View style={styles.socialContainer}>
             <SocialButton type="facebook" />
@@ -118,5 +178,10 @@ const styles = StyleSheet.create({
   switchAuthLink: {
     color: "#00C2FF",
     fontWeight: "bold",
+  },
+  errorText: {
+    color: "red",
+    marginBottom: 15,
+    textAlign: "center",
   },
 });

@@ -1,5 +1,5 @@
-import { StyleSheet, TouchableOpacity, View, Text } from "react-native";
-import { Link, router } from "expo-router";
+import { StyleSheet, Text } from "react-native";
+import { router } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import Logo from "@/components/logo";
 import Button from "@/components/Button";

@@ -1,4 +1,6 @@
-import React, { useState } from "react";
+"use client";
+
+import { useState } from "react";
 import {
   View,
   Text,
@@ -8,15 +10,47 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import Button from "@/components/Button";
 import SocialButton from "@/components/Socialbutton";
+import { useAuth } from "@/context/auth-context";
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const { login, isLoading, error } = useAuth();
+
+  // Form validation
+  const validateForm = () => {
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      Alert.alert("Invalid Email", "Please enter a valid email address");
+      return false;
+    }
+
+    // Password validation
+    if (password.length < 1) {
+      Alert.alert("Missing Password", "Please enter your password");
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleLogin = async () => {
+    if (validateForm()) {
+      try {
+        await login(email, password);
+      } catch (e) {
+        // Error is handled in the auth context
+      }
+    }
+  };
 
   return (
     <KeyboardAvoidingView
@@ -31,6 +65,8 @@ export default function LoginScreen() {
           </TouchableOpacity>
           <Text style={styles.title}>Welcome back!</Text>
 
+          {error && <Text style={styles.errorText}>{error}</Text>}
+
           <View style={styles.inputContainer}>
             <TextInput
               style={styles.input}
@@ -39,6 +75,7 @@ export default function LoginScreen() {
               onChangeText={setEmail}
               keyboardType="email-address"
               autoCapitalize="none"
+              editable={!isLoading}
             />
             <TextInput
               style={styles.input}
@@ -46,13 +83,18 @@ export default function LoginScreen() {
               value={password}
               onChangeText={setPassword}
               secureTextEntry
+              editable={!isLoading}
             />
             <TouchableOpacity>
               <Text style={styles.forgotPassword}>Forgot your password?</Text>
             </TouchableOpacity>
           </View>
 
-          <Button title="Login" onPress={() => router.push("/(tabs)")} />
+          {isLoading ? (
+            <ActivityIndicator size="large" color="#00C2FF" />
+          ) : (
+            <Button title="Login" onPress={handleLogin} />
+          )}
 
           <View style={styles.socialContainer}>
             <SocialButton type="facebook" />
@@ -126,5 +168,10 @@ const styles = StyleSheet.create({
   switchAuthLink: {
     color: "#00C2FF",
     fontWeight: "bold",
+  },
+  errorText: {
+    color: "red",
+    marginBottom: 15,
+    textAlign: "center",
   },
 });

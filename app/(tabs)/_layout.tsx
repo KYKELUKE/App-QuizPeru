@@ -1,3 +1,4 @@
+import type React from "react";
 import { Tabs } from "expo-router";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import Colors from "@/constants/Colors";
@@ -40,6 +41,22 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => (
             <TabBarIcon name="question-circle" color={color} />
           ),
+        }}
+      />
+      <Tabs.Screen
+        name="explore"
+        options={{
+          title: "Explorar",
+          tabBarIcon: ({ color }) => (
+            <TabBarIcon name="compass" color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="create"
+        options={{
+          title: "Mis Temas",
+          tabBarIcon: ({ color }) => <TabBarIcon name="pencil" color={color} />,
         }}
       />
     </Tabs>
