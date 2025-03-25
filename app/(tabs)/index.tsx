@@ -1,8 +1,9 @@
-import { StyleSheet, Text } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import Logo from "@/components/logo";
 import Button from "@/components/Button";
+import SupabaseConnectionTest from "@/components/SupabaseConnectionTest";
 
 export default function HomeScreen() {
   return (
@@ -20,6 +21,11 @@ export default function HomeScreen() {
         onPress={() => router.push("/register")}
         style={styles.button}
       />
+
+      {/* Componente de prueba - Puedes eliminar esto después de verificar la conexión */}
+      <View style={styles.testContainer}>
+        <SupabaseConnectionTest />
+      </View>
     </LinearGradient>
   );
 }
@@ -39,5 +45,12 @@ const styles = StyleSheet.create({
   },
   button: {
     width: "80%",
+  },
+  testContainer: {
+    position: "absolute",
+    bottom: 20,
+    left: 0,
+    right: 0,
+    zIndex: 999,
   },
 });

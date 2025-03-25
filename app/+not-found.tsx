@@ -1,3 +1,4 @@
+// app/+not-found.tsx
 import { Link, Stack } from "expo-router";
 import { StyleSheet } from "react-native";
 
@@ -9,11 +10,10 @@ export default function NotFoundScreen() {
     <>
       <Stack.Screen options={{ title: "Oops!" }} />
       <ThemedView style={styles.container}>
-        <ThemedText type="title">This screen doesn't exist.</ThemedText>
-        <Link href="https://yourapp.com/home" asChild>
-          <ThemedText type="link" style={styles.link}>
-            Go to home screen!
-          </ThemedText>
+        <ThemedText type="title">Esta pantalla no existe.</ThemedText>
+        <Link href="/" style={styles.link}>
+          {/* Usar un Text normal dentro del Link en lugar de ThemedText */}
+          <ThemedText type="link">¡Ir a la pantalla principal!</ThemedText>
         </Link>
       </ThemedView>
     </>

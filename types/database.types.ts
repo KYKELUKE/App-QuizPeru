@@ -34,3 +34,17 @@ export type QuizResult = {
   total_questions: number;
   created_at: string;
 };
+
+export type UserProfile = {
+  id: string;
+  username: string;
+  avatar_url?: string;
+  created_at: string;
+};
+
+export type UserStats = {
+  quizzes_taken: number;
+  correct_answers: number;
+  total_questions: number;
+  average_score: number;
+};

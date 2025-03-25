@@ -1,6 +1,9 @@
 import { supabase } from "@/lib/supabase";
 import type { QuizTheme } from "@/types/database.types";
 
+// Añadir un sistema de eventos simple para notificar cambios en los temas
+let themeListeners: (() => void)[] = [];
+
 export const themeService = {
   // Obtener todos los temas (públicos o del usuario actual)
   async getThemes(userId: string): Promise<QuizTheme[]> {
@@ -12,6 +15,22 @@ export const themeService = {
 
     if (error) {
       console.error("Error fetching themes:", error);
+      throw error;
+    }
+
+    return data || [];
+  },
+
+  // Obtener solo los temas públicos
+  async getPublicThemes(): Promise<QuizTheme[]> {
+    const { data, error } = await supabase
+      .from("themes")
+      .select("*")
+      .eq("is_public", true)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Error fetching public themes:", error);
       throw error;
     }
 
@@ -68,6 +87,9 @@ export const themeService = {
       throw error;
     }
 
+    // Notificar a los suscriptores sobre el nuevo tema
+    this.notifyThemeChanges();
+
     return data;
   },
 
@@ -88,6 +110,9 @@ export const themeService = {
       throw error;
     }
 
+    // Notificar a los suscriptores sobre el tema actualizado
+    this.notifyThemeChanges();
+
     return data;
   },
 
@@ -99,6 +124,9 @@ export const themeService = {
       console.error("Error deleting theme:", error);
       throw error;
     }
+
+    // Notificar a los suscriptores sobre el tema eliminado
+    this.notifyThemeChanges();
   },
 
   // Incrementar el contador de preguntas de un tema
@@ -123,5 +151,20 @@ export const themeService = {
       console.error("Error decrementing question count:", error);
       throw error;
     }
+  },
+
+  // Suscribirse a cambios en los temas
+  subscribeToThemeChanges(callback: () => void) {
+    themeListeners.push(callback);
+    return () => {
+      themeListeners = themeListeners.filter(
+        (listener) => listener !== callback
+      );
+    };
+  },
+
+  // Notificar a los suscriptores sobre cambios en los temas
+  notifyThemeChanges() {
+    themeListeners.forEach((callback) => callback());
   },
 };

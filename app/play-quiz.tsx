@@ -10,16 +10,20 @@ import {
   Alert,
   ActivityIndicator,
   Animated,
+  Share,
 } from "react-native";
 import { Ionicons, FontAwesome5 } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import type { QuizTheme } from "./(tabs)/create";
-import type { Question } from "./create-question";
+import { useAuth } from "@/context/auth-context";
+import { themeService } from "@/services/theme-service";
+import { questionService } from "@/services/question-service";
+import { quizService } from "@/services/quiz-service";
+import type { QuizTheme, Question } from "@/types/database.types";
 
 export default function PlayQuizScreen() {
   const params = useLocalSearchParams();
   const themeId = params.themeId as string;
+  const { user } = useAuth();
 
   const [theme, setTheme] = useState<QuizTheme | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -69,9 +73,7 @@ export default function PlayQuizScreen() {
       setIsLoading(true);
 
       // Cargar tema
-      const themesJson = await AsyncStorage.getItem("quizThemes");
-      const themes: QuizTheme[] = themesJson ? JSON.parse(themesJson) : [];
-      const foundTheme = themes.find((t) => t.id === themeId);
+      const foundTheme = await themeService.getThemeById(themeId);
 
       if (foundTheme) {
         setTheme(foundTheme);
@@ -82,11 +84,7 @@ export default function PlayQuizScreen() {
       }
 
       // Cargar preguntas
-      const questionsJson = await AsyncStorage.getItem("quizQuestions");
-      const allQuestions: Question[] = questionsJson
-        ? JSON.parse(questionsJson)
-        : [];
-      const themeQuestions = allQuestions.filter((q) => q.themeId === themeId);
+      const themeQuestions = await questionService.getQuestionsByTheme(themeId);
 
       if (themeQuestions.length === 0) {
         Alert.alert("Error", "Este tema no tiene preguntas", [
@@ -125,7 +123,7 @@ export default function PlayQuizScreen() {
       (opt) => opt.id === optionId
     );
 
-    if (selectedOptionObj?.isCorrect) {
+    if (selectedOptionObj?.is_correct) {
       setScore((prev) => prev + 1);
     }
   };
@@ -146,22 +144,35 @@ export default function PlayQuizScreen() {
 
   const saveQuizResult = async () => {
     try {
-      const historyJson = await AsyncStorage.getItem("quizHistory");
-      const history = historyJson ? JSON.parse(historyJson) : [];
+      if (!user?.email || !theme) return;
 
-      const result = {
-        id: Date.now().toString(),
-        themeId,
-        themeName: theme?.title || "",
+      await quizService.saveQuizResult({
+        theme_id: themeId,
+        theme_name: theme.title,
+        user_id: user.email,
         score,
-        totalQuestions: questions.length,
-        date: new Date().toISOString(),
-      };
+        total_questions: questions.length,
+      });
 
-      history.push(result);
-      await AsyncStorage.setItem("quizHistory", JSON.stringify(history));
+      console.log("Quiz result saved successfully");
     } catch (error) {
       console.error("Error saving quiz result:", error);
+    }
+  };
+
+  const shareResult = async () => {
+    if (!theme) return;
+
+    try {
+      await Share.share({
+        message: `¡He completado el quiz "${
+          theme.title
+        }" con una puntuación de ${score}/${questions.length} (${Math.round(
+          (score / questions.length) * 100
+        )}%)! ¡Intenta superarme en la app PerúQuiz!`,
+      });
+    } catch (error) {
+      console.error("Error sharing result:", error);
     }
   };
 
@@ -232,11 +243,19 @@ export default function PlayQuizScreen() {
 
           <View style={styles.resultActions}>
             <TouchableOpacity
+              style={[styles.resultButton, styles.shareButton]}
+              onPress={shareResult}>
+              <Ionicons name="share-social" size={20} color="#fff" />
+              <Text style={styles.shareButtonText}>Compartir</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
               style={[styles.resultButton, styles.restartButton]}
               onPress={restartQuiz}>
               <Ionicons name="refresh" size={20} color="#0F3057" />
               <Text style={styles.restartButtonText}>Reintentar</Text>
             </TouchableOpacity>
+
             <TouchableOpacity
               style={[styles.resultButton, styles.exitButton]}
               onPress={exitQuiz}>
@@ -300,8 +319,8 @@ export default function PlayQuizScreen() {
         <View style={styles.optionsContainer}>
           {currentQuestion.options.map((option) => {
             const isSelected = selectedOption === option.id;
-            const isCorrect = option.isCorrect && isAnswered;
-            const isWrong = isSelected && !option.isCorrect && isAnswered;
+            const isCorrect = option.is_correct && isAnswered;
+            const isWrong = isSelected && !option.is_correct && isAnswered;
 
             return (
               <TouchableOpacity
@@ -321,7 +340,7 @@ export default function PlayQuizScreen() {
                   ]}>
                   {option.text}
                 </Text>
-                {isAnswered && option.isCorrect && (
+                {isAnswered && option.is_correct && (
                   <Ionicons name="checkmark-circle" size={20} color="#fff" />
                 )}
                 {isWrong && (
@@ -510,10 +529,10 @@ const styles = StyleSheet.create({
     color: "#0F3057",
   },
   resultActions: {
-    flexDirection: "row",
+    flexDirection: "column",
     justifyContent: "center",
     width: "100%",
-    gap: 16,
+    gap: 12,
   },
   resultButton: {
     flexDirection: "row",
@@ -522,7 +541,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 8,
-    flex: 1,
+    width: "100%",
+  },
+  shareButton: {
+    backgroundColor: "#4267B2", // Facebook blue
   },
   restartButton: {
     backgroundColor: "#f0f0f0",
@@ -531,6 +553,11 @@ const styles = StyleSheet.create({
   },
   exitButton: {
     backgroundColor: "#0F3057",
+  },
+  shareButtonText: {
+    color: "#fff",
+    fontWeight: "bold",
+    marginLeft: 8,
   },
   restartButtonText: {
     color: "#0F3057",

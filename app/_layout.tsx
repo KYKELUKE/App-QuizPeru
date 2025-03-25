@@ -1,7 +1,6 @@
 "use client";
 
 import type React from "react";
-
 import {
   DarkTheme,
   DefaultTheme,
@@ -18,9 +17,13 @@ import { useColorScheme } from "@/hooks/useColorScheme";
 import { AuthProvider, useAuth } from "@/context/auth-context";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
-SplashScreen.preventAutoHideAsync();
+try {
+  SplashScreen.preventAutoHideAsync();
+} catch (error) {
+  console.warn("Error preventing splash screen from hiding:", error);
+}
 
-// Componente para proteger rutas
+// Componente para proteger rutas con mejor manejo de errores
 function ProtectedRouteGuard({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
   const segments = useSegments();
@@ -29,24 +32,54 @@ function ProtectedRouteGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (isLoading) return;
 
-    const inAuthGroup = segments[0] === "(tabs)";
-    const inAuthScreens = segments[0] === "login" || segments[0] === "register";
+    try {
+      const inAuthGroup = segments[0] === "(tabs)";
+      const inAuthScreens =
+        segments[0] === "login" || segments[0] === "register";
+      const isIndexScreen = segments.length === 1 && segments[0] === "";
 
-    if (!user && inAuthGroup) {
-      // Si el usuario no está autenticado pero intenta acceder a rutas protegidas,
-      // redirigir a la pantalla de inicio
-      router.replace("/");
-    } else if (
-      user &&
-      !inAuthGroup &&
-      !inAuthScreens &&
-      segments[0] !== "modal"
-    ) {
-      // Si el usuario está autenticado y no está en una ruta protegida, modal o pantallas de auth,
-      // redirigir a la pantalla principal de tabs
-      router.replace("/(tabs)");
+      // Lista de rutas permitidas fuera del grupo de tabs para usuarios autenticados
+      const allowedRoutes = [
+        "create-theme",
+        "create-question",
+        "theme-questions",
+        "play-quiz",
+        "modal",
+      ];
+
+      const isAllowedRoute = allowedRoutes.includes(segments[0]);
+
+      console.log("Auth state:", {
+        user: !!user,
+        inAuthGroup,
+        inAuthScreens,
+        segments,
+        isAllowedRoute,
+      });
+
+      if (!user && inAuthGroup) {
+        // Si el usuario no está autenticado pero intenta acceder a rutas protegidas,
+        // redirigir a la pantalla de inicio
+        console.log(
+          "Redirecting unauthenticated user from protected route to home"
+        );
+        router.replace("/");
+      } else if (
+        user &&
+        !inAuthGroup &&
+        !inAuthScreens &&
+        !isAllowedRoute &&
+        !isIndexScreen
+      ) {
+        // Si el usuario está autenticado y no está en una ruta permitida,
+        // redirigir a la pantalla principal de tabs
+        console.log("Redirecting authenticated user to tabs");
+        router.replace("/(tabs)");
+      }
+    } catch (error) {
+      console.error("Error in route protection:", error);
     }
-  }, [user, isLoading]);
+  }, [user, isLoading, segments]);
 
   return <>{children}</>;
 }
@@ -63,6 +96,16 @@ function RootLayoutNav() {
           <Stack.Screen name="+not-found" />
           <Stack.Screen name="login" options={{ headerShown: false }} />
           <Stack.Screen name="register" options={{ headerShown: false }} />
+          <Stack.Screen name="create-theme" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="create-question"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="theme-questions"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen name="play-quiz" options={{ headerShown: false }} />
         </Stack>
       </ProtectedRouteGuard>
       <StatusBar style="auto" />
@@ -71,17 +114,27 @@ function RootLayoutNav() {
 }
 
 export default function RootLayout() {
-  const [loaded] = useFonts({
+  const [loaded, error] = useFonts({
     SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
   });
 
   useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync();
+    if (loaded || error) {
+      try {
+        SplashScreen.hideAsync();
+      } catch (e) {
+        console.warn("Error hiding splash screen:", e);
+      }
     }
-  }, [loaded]);
+  }, [loaded, error]);
 
-  if (!loaded) {
+  // Manejar error de carga de fuentes
+  if (error) {
+    console.warn("Error loading fonts:", error);
+  }
+
+  // Mostrar null es seguro mientras se cargan las fuentes
+  if (!loaded && !error) {
     return null;
   }
 

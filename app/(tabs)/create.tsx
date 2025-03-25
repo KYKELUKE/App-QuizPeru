@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -9,18 +9,22 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import { Ionicons, FontAwesome5 } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { useAuth } from "@/context/auth-context";
 import { themeService } from "@/services/theme-service";
+import { questionService } from "@/services/question-service";
 import type { QuizTheme } from "@/types/database.types";
+import { useFocusEffect } from "@react-navigation/native";
 
 export default function CreateScreen() {
   const { user } = useAuth();
   const [userThemes, setUserThemes] = useState<QuizTheme[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Cargar temas del usuario al iniciar
   useEffect(() => {
@@ -28,6 +32,19 @@ export default function CreateScreen() {
       loadUserThemes();
     }
   }, [user]);
+
+  // Recargar temas cuando la pantalla vuelve a estar en foco
+  useFocusEffect(
+    useCallback(() => {
+      if (user) {
+        console.log("Screen focused, reloading themes...");
+        loadUserThemes();
+      }
+      return () => {
+        // Cleanup function (optional)
+      };
+    }, [user])
+  );
 
   // Función para cargar los temas creados por el usuario
   const loadUserThemes = async () => {
@@ -46,7 +63,14 @@ export default function CreateScreen() {
     } finally {
       setIsLoading(false);
     }
+    // Devolver una promesa resuelta para poder encadenar .finally()
+    return Promise.resolve();
   };
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadUserThemes().finally(() => setRefreshing(false));
+  }, [user]);
 
   // Función para crear un nuevo tema
   const createNewTheme = () => {
@@ -77,6 +101,41 @@ export default function CreateScreen() {
     });
   };
 
+  // Función para jugar un quiz
+  const playQuiz = async (themeId: string) => {
+    try {
+      // Verificar si el tema tiene preguntas
+      const questions = await questionService.getQuestionsByTheme(themeId);
+
+      if (questions.length === 0) {
+        Alert.alert(
+          "No hay preguntas",
+          "Este tema no tiene preguntas. Añade algunas preguntas antes de jugar.",
+          [
+            {
+              text: "Añadir preguntas",
+              onPress: () => createQuestions(themeId),
+            },
+            {
+              text: "Cancelar",
+              style: "cancel",
+            },
+          ]
+        );
+        return;
+      }
+
+      // Si hay preguntas, navegar a la pantalla de juego
+      router.push({
+        pathname: "/play-quiz",
+        params: { themeId },
+      });
+    } catch (error) {
+      console.error("Error checking questions:", error);
+      Alert.alert("Error", "No se pudo verificar si el tema tiene preguntas");
+    }
+  };
+
   // Función para eliminar un tema
   const deleteTheme = async (themeId: string) => {
     Alert.alert(
@@ -102,6 +161,20 @@ export default function CreateScreen() {
       ]
     );
   };
+
+  // Añadir este useEffect después de los otros efectos:
+  useEffect(() => {
+    // Suscribirse a cambios en los temas
+    const unsubscribe = themeService.subscribeToThemeChanges(() => {
+      console.log("Theme changes detected, reloading themes...");
+      loadUserThemes();
+    });
+
+    // Limpiar la suscripción al desmontar
+    return () => {
+      unsubscribe();
+    };
+  }, [user]);
 
   return (
     <View style={styles.container}>
@@ -134,7 +207,16 @@ export default function CreateScreen() {
           </TouchableOpacity>
         </View>
       ) : (
-        <ScrollView showsVerticalScrollIndicator={false}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={["#0F3057"]}
+              tintColor="#0F3057"
+            />
+          }>
           {userThemes.map((theme) => (
             <View key={theme.id} style={styles.themeCard}>
               <LinearGradient
@@ -150,6 +232,23 @@ export default function CreateScreen() {
                 <Text style={styles.themeQuestions}>
                   {theme.questions_count} preguntas
                 </Text>
+
+                {/* Botones de acción principales */}
+                <View style={styles.mainActions}>
+                  <TouchableOpacity
+                    style={styles.playButton}
+                    onPress={() => playQuiz(theme.id)}>
+                    <Ionicons name="play" size={16} color="#fff" />
+                    <Text style={styles.playButtonText}>Jugar</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.questionsButton}
+                    onPress={() => viewQuestions(theme.id)}>
+                    <Ionicons name="list" size={16} color="#0F3057" />
+                    <Text style={styles.questionsButtonText}>Preguntas</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
               <View style={styles.themeActions}>
                 <TouchableOpacity
@@ -161,11 +260,6 @@ export default function CreateScreen() {
                   style={styles.actionButton}
                   onPress={() => createQuestions(theme.id)}>
                   <Ionicons name="add-circle" size={18} color="#555" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.actionButton}
-                  onPress={() => viewQuestions(theme.id)}>
-                  <Ionicons name="eye" size={18} color="#555" />
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.actionButton, styles.deleteButton]}
@@ -284,6 +378,40 @@ const styles = StyleSheet.create({
   themeQuestions: {
     fontSize: 12,
     color: "#888",
+    marginBottom: 10,
+  },
+  mainActions: {
+    flexDirection: "row",
+    marginTop: 5,
+  },
+  playButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#0F3057",
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    marginRight: 10,
+  },
+  playButtonText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "bold",
+    marginLeft: 4,
+  },
+  questionsButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f0f0f0",
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+  },
+  questionsButtonText: {
+    color: "#0F3057",
+    fontSize: 12,
+    fontWeight: "bold",
+    marginLeft: 4,
   },
   themeActions: {
     flexDirection: "column",

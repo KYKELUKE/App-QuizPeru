@@ -4,7 +4,11 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AppState } from "react-native";
 import Constants from "expo-constants";
 
-// Obtener las credenciales de Supabase desde Constants (app.config.js)
+// IMPORTANTE: Reemplaza estos valores con tus credenciales reales de Supabase
+export const SUPABASE_URL = "https://tu-proyecto-real.supabase.co";
+export const SUPABASE_ANON_KEY = "tu-clave-anonima-real";
+
+// Obtener las credenciales de Supabase desde las variables de entorno o Constants
 const getSupabaseCredentials = () => {
   // Intenta obtener de process.env primero
   let url = process.env.EXPO_PUBLIC_SUPABASE_URL;
@@ -29,19 +33,37 @@ const { url: supabaseUrl, key: supabaseAnonKey } = getSupabaseCredentials();
 // Verificar que tenemos las credenciales
 if (!supabaseUrl || !supabaseAnonKey) {
   console.warn(
-    "Supabase URL o Anon Key no encontrados. Verifica tus variables de entorno o app.config.js."
+    "Supabase URL or Anon Key is missing. Please check your environment variables or app.config.js."
   );
 }
 
+// Crear un cliente de Supabase con manejo de errores
+const createSupabaseClient = () => {
+  try {
+    return createClient(supabaseUrl || "", supabaseAnonKey || "", {
+      auth: {
+        storage: AsyncStorage,
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: false,
+      },
+    });
+  } catch (error) {
+    console.error("Error creating Supabase client:", error);
+    // Devolver un cliente con URL y clave vacías como fallback
+    return createClient("", "", {
+      auth: {
+        storage: AsyncStorage,
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: false,
+      },
+    });
+  }
+};
+
 // Inicializar el cliente de Supabase
-export const supabase = createClient(supabaseUrl || "", supabaseAnonKey || "", {
-  auth: {
-    storage: AsyncStorage,
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: false,
-  },
-});
+export const supabase = createSupabaseClient();
 
 // Configurar el manejo del estado de la aplicación para mantener la sesión
 try {
@@ -54,22 +76,4 @@ try {
   });
 } catch (error) {
   console.error("Error setting up AppState listener:", error);
-}
-
-// Función para probar la conexión a Supabase
-export async function testSupabaseConnection() {
-  try {
-    const { data, error } = await supabase.from("themes").select("count");
-
-    if (error) {
-      console.error("Error conectando a Supabase:", error);
-      return false;
-    }
-
-    console.log("Conexión a Supabase exitosa!");
-    return true;
-  } catch (e) {
-    console.error("Excepción al conectar a Supabase:", e);
-    return false;
-  }
 }

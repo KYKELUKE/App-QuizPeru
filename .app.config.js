@@ -1,3 +1,12 @@
+// Importar dotenv para cargar variables de entorno
+require("dotenv").config();
+
+// Verificar que las variables de entorno se están cargando
+console.log("Cargando app.config.js con variables:", {
+  SUPABASE_URL: process.env.EXPO_PUBLIC_SUPABASE_URL,
+  SUPABASE_KEY: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ? "***" : undefined,
+});
+
 module.exports = {
   expo: {
     name: "PeruQuiz",
@@ -36,6 +45,8 @@ module.exports = {
         },
       ],
       "expo-font",
+      "@react-native-async-storage/async-storage",
+      "expo-secure-store",
     ],
     experiments: {
       typedRoutes: true,
@@ -50,6 +61,7 @@ module.exports = {
       // Aquí puedes acceder a las variables de entorno
       supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
       supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
+      appName: process.env.EXPO_PUBLIC_APP_NAME || "PerúQuiz",
     },
     runtimeVersion: {
       policy: "appVersion",
